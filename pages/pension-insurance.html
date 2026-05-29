@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国职工养老保险收益测算 - Bagatelle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body class="app-shell page-scroll">
+    <nav class="site-nav" aria-label="主导航">
+        <a class="brand-lockup" href="../index.html" aria-label="Bagatelle 首页">
+            <span class="brand-mark">B</span>
+            <span>
+                <span class="brand-title">Bagatelle</span>
+                <span class="brand-subtitle">financial atelier</span>
+            </span>
+        </a>
+        <div class="nav-links">
+            <a class="nav-link" href="../index.html">房产投资测算</a>
+            <a class="nav-link active" href="./pension-insurance.html">养老保险测算</a>
+            <a class="nav-link" href="./germany-tax.html">德国报税测算</a>
+            <a class="nav-link disabled" href="#" aria-disabled="true">更多页面预留</a>
+        </div>
+    </nav>
+
+    <main class="page-container">
+        <section class="pension-grid">
+            <aside class="control-panel pension-controls">
+                <div class="panel-hero p-6 text-white">
+                    <h2 class="text-xl font-bold">灵活就业保险收益</h2>
+                    <p class="text-blue-100 text-sm mt-2">工资假设、缴费指数与退休年龄</p>
+                </div>
+
+                <div class="control-scroll p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">快捷地区参考</label>
+                        <select id="regionSelect" class="bagatelle-input" onchange="updateDefaultWage()">
+                            <option value="7000">全国默认模版 (缴费基数: 7000)</option>
+                            <option value="5965">河南 (2024年参考: 5965)</option>
+                            <option value="7625">新疆 (2022年参考: 7625)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                            <span>社会平均工资 (缴费期间)</span>
+                            <span class="text-gray-400 text-xs font-normal">计算缴费额</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="wagePay" value="7000" class="bagatelle-input pr-9" oninput="calculate()">
+                            <span class="input-suffix">¥</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                            <span>社会平均工资 (退休时)</span>
+                            <span class="text-gray-400 text-xs font-normal">计算基础养老金</span>
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="wageRetire" value="8000" class="bagatelle-input pr-9" oninput="calculate()">
+                            <span class="input-suffix">¥</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                            <span>个人平均缴费指数</span>
+                            <span class="text-gray-400 text-xs font-normal">0.6 ~ 3.0</span>
+                        </label>
+                        <input type="number" id="payIndex" value="0.6" step="0.1" class="bagatelle-input" oninput="calculate()">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">出生年份</label>
+                            <input type="number" id="birthYear" value="1988" class="bagatelle-input" oninput="calculate()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">起缴年份</label>
+                            <input type="number" id="startYear" value="2019" class="bagatelle-input" oninput="calculate()">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                            <span>退休年龄</span>
+                            <span class="text-gray-400 text-xs font-normal">自动推出计发月数</span>
+                        </label>
+                        <input type="number" id="retirementAge" value="65" min="40" max="70" class="bagatelle-input" oninput="calculate()">
+                        <p id="payoutMonthsHint" class="text-xs text-gray-400 mt-2">计发月数：101个月</p>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="pension-results space-y-5">
+                <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="kpi-card p-4 kpi-help">
+                        <div class="kpi-label-row">
+                            <div class="text-xs text-gray-500 mb-1">每月缴纳总额 (20%)</div>
+                            <span class="info-dot" aria-label="算法说明">i</span>
+                            <div class="kpi-tooltip">
+                                <strong>算法</strong>
+                                <p>每月缴纳总额 = 社会平均工资（缴费期间） × 个人平均缴费指数 × 20%。</p>
+                                <p>统筹账户 = 工资 × 指数 × 12%；个人账户 = 工资 × 指数 × 8%。</p>
+                            </div>
+                        </div>
+                        <div class="text-xl font-bold text-red-500">¥ <span id="outMonthlyPay">0</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1">统筹 <span id="outPoolPay">0</span> | 个人 <span id="outPersonalPay">0</span></div>
+                    </div>
+                    <div class="kpi-card p-4 kpi-help">
+                        <div class="kpi-label-row">
+                            <div class="text-xs text-gray-500 mb-1">缴费总成本 (<span id="outYears">0</span>年)</div>
+                            <span class="info-dot" aria-label="算法说明">i</span>
+                            <div class="kpi-tooltip">
+                                <strong>算法</strong>
+                                <p>缴费年限 = 出生年份 + 退休年龄 - 起缴年份。</p>
+                                <p>缴费总成本 = 每月缴纳总额 × 12 × 缴费年限。</p>
+                                <p>个人账户总计 = 个人账户月缴 × 12 × 缴费年限。</p>
+                            </div>
+                        </div>
+                        <div class="text-xl font-bold text-gray-800">¥ <span id="outTotalPay">0</span></div>
+                        <div class="text-[10px] text-gray-400 mt-1">个人账户总计: ¥<span id="outTotalPersonal">0</span></div>
+                    </div>
+                    <div class="kpi-card highlight-kpi p-4 kpi-help">
+                        <div class="kpi-label-row">
+                            <div class="text-xs text-blue-600 font-bold mb-1">预计每月领取养老金</div>
+                            <span class="info-dot" aria-label="算法说明">i</span>
+                            <div class="kpi-tooltip">
+                                <strong>算法</strong>
+                                <p>每月养老金 = 基础养老金 + 个人账户养老金。</p>
+                                <p>基础养老金 = 退休时社会平均工资 × (1 + 缴费指数) ÷ 2 × 缴费年限 × 1%。</p>
+                                <p>个人账户养老金 = 个人账户总计 ÷ 计发月数；计发月数由退休年龄推出。</p>
+                            </div>
+                        </div>
+                        <div class="text-2xl font-bold text-blue-600">¥ <span id="outMonthlyPension">0</span></div>
+                        <div class="text-[10px] text-gray-500 mt-1">基础 <span id="outBasicPension">0</span> | 个人 <span id="outPersonalPension">0</span></div>
+                    </div>
+                    <div class="kpi-card p-4 kpi-help">
+                        <div class="kpi-label-row">
+                            <div class="text-xs text-gray-500 mb-1">静态回本时间</div>
+                            <span class="info-dot" aria-label="算法说明">i</span>
+                            <div class="kpi-tooltip kpi-tooltip-right">
+                                <strong>算法</strong>
+                                <p>静态回本时间 = 缴费总成本 ÷ (预计每月领取养老金 × 12)。</p>
+                                <p>退休10年回报率 = (每月养老金 × 12 × 10 - 缴费总成本) ÷ 缴费总成本。</p>
+                            </div>
+                        </div>
+                        <div class="text-xl font-bold text-green-600"><span id="outPayback">0</span> 年</div>
+                        <div class="text-[10px] text-gray-400 mt-1">退休10年回报率: <span id="outRoi10">0</span>%</div>
+                    </div>
+                </div>
+
+                <div class="chart-card pension-chart-card p-5 flex flex-col">
+                    <h2 class="section-title text-lg font-bold text-gray-800 mb-3 text-center">退休后累计领取 vs 沉没成本趋势图</h2>
+                    <div class="relative flex-1 w-full min-h-0">
+                        <canvas id="pensionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card wage-chart-card p-5 flex flex-col">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
+                        <h2 class="section-title text-lg font-bold text-gray-800" id="wageChartTitle">全国过去10年平均工资走势与预测</h2>
+                        <span class="matrix-pill">官方历史 + CAGR预测</span>
+                    </div>
+                    <div class="relative flex-1 w-full min-h-0">
+                        <canvas id="wageChart"></canvas>
+                    </div>
+                    <p id="wageSource" class="text-xs text-gray-400 mt-3">
+                        来源：国家统计局《城镇非私营单位就业人员年平均工资》2014–2023；2024+ 为按近十年复合增速的机械外推，仅作情景参考。
+                    </p>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script src="../assets/js/pension-insurance.js"></script>
+</body>
+</html>

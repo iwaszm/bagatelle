@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柏林房产投资：20年收益与现金流测算</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body class="app-shell">
+    <nav class="site-nav" aria-label="主导航">
+        <a class="brand-lockup" href="../index.html" aria-label="Bagatelle 首页">
+            <span class="brand-mark">B</span>
+            <span>
+                <span class="brand-title">Bagatelle</span>
+                <span class="brand-subtitle">financial atelier</span>
+            </span>
+        </a>
+        <div class="nav-links">
+            <a class="nav-link active" href="../index.html">房产投资测算</a>
+            <a class="nav-link" href="./pension-insurance.html">养老保险测算</a>
+            <a class="nav-link" href="./germany-tax.html">德国报税测算</a>
+            <a class="nav-link disabled" href="#" aria-disabled="true">更多页面预留</a>
+        </div>
+    </nav>
+
+    <div class="workspace">
+
+    <!-- 左侧控制面板 -->
+        <aside class="control-panel w-full md:w-1/3 lg:w-1/4 flex flex-col h-full z-10">
+        <div class="panel-hero p-6 text-white">
+            <h1 class="text-xl font-bold">房产投资核心参数</h1>
+            <p class="text-blue-100 text-sm mt-2">实时测算投资现金流与资产积累</p>
+        </div>
+
+        <div class="control-scroll flex-1 overflow-y-auto p-6 space-y-6">
+            
+            <!-- 房屋选择 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">1. 输入投资标的 (房价及对应冷租)</label>
+                <div class="space-y-2">
+                    <label class="choice-card custom-property-card block p-3 border rounded-lg cursor-pointer transition bg-blue-50 border-blue-200">
+                        <div class="flex items-center">
+                            <input type="radio" name="propertyOption" value="custom" class="w-4 h-4 text-blue-600" checked onchange="calculate()">
+                            <span class="ml-3 text-sm font-medium">自定义标的</span>
+                        </div>
+                        <div class="custom-input-grid mt-3 grid grid-cols-2 gap-3">
+                            <label class="text-xs text-gray-500">
+                                房价（万欧）
+                                <input id="customPriceInput" type="number" min="1" step="1" value="60" class="custom-number-input mt-1 w-full" onfocus="selectCustomProperty();" oninput="calculate()">
+                            </label>
+                            <label class="text-xs text-gray-500">
+                                房租（€/月）
+                                <input id="customRentInput" type="number" min="0" step="50" value="1900" class="custom-number-input mt-1 w-full" onfocus="selectCustomProperty();" oninput="calculate()">
+                            </label>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-500">含8%附加费总需资金:</span>
+                    <span id="totalCostDisplay" class="font-bold text-gray-800">540,000 €</span>
+                </div>
+            </div>
+
+            <!-- 资金结构 -->
+            <div>
+                <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>2. 投入存款 (首付款)</span>
+                    <span id="depositVal" class="text-blue-600">200,000 €</span>
+                </label>
+                <input type="range" id="depositInput" min="50000" max="600000" step="5000" value="200000" class="slider-range" oninput="syncLoanFromDeposit(); calculate()">
+            </div>
+
+            <div>
+                <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>3. 贷款额度</span>
+                    <span id="loanVal" class="text-red-500">340,000 €</span>
+                </label>
+                <input type="range" id="loanInput" min="0" max="600000" step="5000" value="340000" class="slider-range" oninput="syncDepositFromLoan(); calculate()">
+            </div>
+
+            <!-- 利率与宏观参数 -->
+            <div>
+                <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>4. 贷款利率 (Zins)</span>
+                    <span id="interestRateVal" class="text-gray-800">3.50%</span>
+                </label>
+                <input type="range" id="interestRateInput" min="1.0" max="6.0" step="0.1" value="3.5" class="slider-range" oninput="calculate()">
+            </div>
+
+            <div>
+                <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>5. 贷款年限 (Jahre)</span>
+                    <span id="loanTermVal" class="text-gray-800">25年</span>
+                </label>
+                <input type="range" id="loanTermInput" min="5" max="40" step="1" value="25" class="slider-range" oninput="calculate()">
+            </div>
+
+            <div>
+                <label class="flex justify-between text-sm font-semibold text-gray-700 mb-2">
+                    <span>6. 个人边际税率 (Steuersatz)</span>
+                    <span id="taxRateVal" class="text-gray-800">42%</span>
+                </label>
+                <input type="range" id="taxRateInput" min="0" max="45" step="1" value="42" class="slider-range" oninput="calculate()">
+            </div>
+            
+            <div class="text-xs text-gray-400 leading-relaxed pb-4">
+                * 模型假设：按房屋建筑价值占75%计算2%直线折旧(AfA)，年租金涨幅1.0%，资产年增值1.0%。
+            </div>
+        </div>
+    </aside>
+
+        <!-- 右侧数据可视化 -->
+    <main class="dashboard-panel dashboard-scroll w-full md:w-2/3 lg:w-3/4 flex flex-col h-full overflow-y-auto p-4 md:p-8">
+        
+        <!-- 核心KPI卡片 -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="kpi-card bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                <div class="text-sm text-gray-500 mb-1">每月总支出 (月供)</div>
+                <div class="text-2xl font-bold text-red-500" id="kpi-mortgage">0 €</div>
+                <div class="text-xs text-gray-400 mt-1">等额本息</div>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                <div class="text-sm text-gray-500 mb-1">首年月净现金流</div>
+                <div class="text-2xl font-bold text-gray-800" id="kpi-netcashflow">0 €</div>
+                <div class="text-xs text-gray-400 mt-1">租金 - 月供 + 抵税/12</div>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                <div class="text-sm text-gray-500 mb-1">利息总支出</div>
+                <div class="text-2xl font-bold text-orange-500" id="kpi-total-interest">0 €</div>
+                <div class="text-xs text-gray-400 mt-1">整个贷款周期纯利息损耗</div>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm p-4 border border-gray-100 group relative cursor-help">
+                <div class="text-sm text-gray-500 mb-1 border-b border-dashed border-gray-300 inline-block">20年后净资产 ⓘ</div>
+                <div class="text-2xl font-bold text-purple-600" id="kpi-netwealth">0 €</div>
+                <div class="text-xs text-gray-400 mt-1">第20年房产估值 - 剩余贷款</div>
+                <!-- Tooltip 悬浮解释 -->
+                <div class="absolute z-50 w-72 p-4 bg-gray-800 text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 right-0 top-full mt-2">
+                    <p class="font-bold mb-2 text-sm border-b border-gray-600 pb-1">20年后净资产 (Net Wealth) 公式：</p>
+                    <p class="text-blue-300 mb-2">第20年房产估值 - 剩余未还贷款 + 累计净现金流</p>
+                    <ul class="list-disc pl-4 mt-1 space-y-1.5 text-gray-300">
+                        <li><strong>房产估值：</strong>假设每年资产自然升值1.0%。</li>
+                        <li><strong>剩余贷款：</strong>随着还款年限缩短至零。</li>
+                        <li><strong>累计净现金流：</strong>前期倒贴月供会拉低净资产；后期租金盈余及提前还清后的纯利润会大幅推高净资产。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 收益图表 -->
+        <div class="chart-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col min-h-[500px] mb-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4" id="chartTitle">全生命周期资产流向与收益曲线</h2>
+            <div class="relative flex-1 w-full h-full">
+                <canvas id="financialChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 宏观利率曲线图 -->
+        <div class="chart-card bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col min-h-[350px] mb-6">
+            <div class="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-2">
+                <h2 class="text-lg font-bold text-gray-800">德国10年期固定房贷利率走势与预测 (2020 - 2028)</h2>
+                <span class="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full font-medium">数据参考: Deutsche Bundesbank / Interhyp 趋势预判</span>
+            </div>
+            <div class="relative flex-1 w-full h-full">
+                <canvas id="macroInterestChart"></canvas>
+            </div>
+            <p class="text-xs text-gray-400 mt-3 text-center">
+                * 注：2022-2023年经历了罕见的激进加息。2026年处于高位企稳阶段，未来大概率温和回落，目前是"锁定资产、未来可重组贷款"的窗口期。
+            </p>
+        </div>
+    </main>
+    </div>
+
+    <script src="../assets/js/property-investment.js"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>德国报税收入流向测算 - Bagatelle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body class="app-shell page-scroll">
+    <nav class="site-nav" aria-label="主导航">
+        <a class="brand-lockup" href="../index.html" aria-label="Bagatelle 首页">
+            <span class="brand-mark">B</span>
+            <span>
+                <span class="brand-title">Bagatelle</span>
+                <span class="brand-subtitle">financial atelier</span>
+            </span>
+        </a>
+        <div class="nav-links">
+            <a class="nav-link" href="../index.html">房产投资测算</a>
+            <a class="nav-link" href="./pension-insurance.html">养老保险测算</a>
+            <a class="nav-link active" href="./germany-tax.html">德国报税测算</a>
+            <a class="nav-link disabled" href="#" aria-disabled="true">更多页面预留</a>
+        </div>
+    </nav>
+
+    <main class="tax-dashboard">
+        <aside class="control-panel tax-controls">
+            <div class="panel-hero p-6 text-white">
+                <h1 class="text-xl font-bold">德国报税收入流向</h1>
+                <p class="text-blue-100 text-sm mt-2">工资、奖金、社保、所得税与补税可能</p>
+            </div>
+
+            <div class="control-scroll p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">申报方式</label>
+                    <select id="filingMode" class="bagatelle-input" onchange="togglePartner(); calculateTaxDashboard();">
+                        <option value="single">个人申报</option>
+                        <option value="joint">夫妇合并申报</option>
+                    </select>
+                </div>
+
+                <section class="tax-person-card">
+                    <div class="tax-person-title">Person A</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="text-xs text-gray-500">税级/Steuerklasse
+                            <select id="taxClassA" class="bagatelle-input mt-1" onchange="calculateTaxDashboard()">
+                                <option selected>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option>
+                            </select>
+                        </label>
+                        <label class="text-xs text-gray-500">税前年收入/Brutto
+                            <span class="money-field mt-1"><input id="grossA" type="text" inputmode="numeric" value="62.489" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <label class="text-xs text-gray-500">奖金 / Bonus
+                            <span class="money-field mt-1"><input id="bonusA" type="text" inputmode="numeric" value="0" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                        <label class="text-xs text-gray-500">工作开销/Werbungskosten
+                            <span class="money-field mt-1"><input id="workExpensesA" type="text" inputmode="numeric" placeholder="1.230" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                    </div>
+                </section>
+
+                <section id="partnerSection" class="tax-person-card partner-disabled">
+                    <div class="tax-person-title">Person B</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="text-xs text-gray-500">税级/Steuerklasse
+                            <select id="taxClassB" class="bagatelle-input mt-1" onchange="calculateTaxDashboard()">
+                                <option>I</option><option>II</option><option>III</option><option selected>V</option><option>IV</option><option>VI</option>
+                            </select>
+                        </label>
+                        <label class="text-xs text-gray-500">税前年收入/Brutto
+                            <span class="money-field mt-1"><input id="grossB" type="text" inputmode="numeric" value="35.000" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <label class="text-xs text-gray-500">奖金 / Bonus
+                            <span class="money-field mt-1"><input id="bonusB" type="text" inputmode="numeric" value="0" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                        <label class="text-xs text-gray-500">工作开销/Werbungskosten
+                            <span class="money-field mt-1"><input id="workExpensesB" type="text" inputmode="numeric" placeholder="1.230" class="bagatelle-input money-input" oninput="handleMoneyInput(this); calculateTaxDashboard()" onblur="formatMoneyInput(this)"><span class="input-unit">€</span></span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="tax-person-card">
+                    <label class="flex items-center justify-between gap-3 text-sm font-semibold text-gray-700">
+                        <span>自定义社保/SV 比例</span>
+                        <input id="customSocialToggle" type="checkbox" class="social-toggle" onchange="toggleSocialInputs(); calculateTaxDashboard();">
+                    </label>
+                    <div id="socialRateGrid" class="grid grid-cols-2 gap-3 mt-3 social-rate-grid social-rate-disabled">
+                        <label class="text-xs text-gray-500">KV 医保 %
+                            <input id="rateHealth" type="number" placeholder="8.525" min="0" step="0.001" class="bagatelle-input mt-1" oninput="calculateTaxDashboard()" disabled>
+                        </label>
+                        <label class="text-xs text-gray-500">PV 护理 %
+                            <input id="rateCare" type="number" placeholder="2.4" min="0" step="0.01" class="bagatelle-input mt-1" oninput="calculateTaxDashboard()" disabled>
+                        </label>
+                        <label class="text-xs text-gray-500">RV 养老 %
+                            <input id="ratePension" type="number" placeholder="9.3" min="0" step="0.01" class="bagatelle-input mt-1" oninput="calculateTaxDashboard()" disabled>
+                        </label>
+                        <label class="text-xs text-gray-500">AV 失业 %
+                            <input id="rateUnemployment" type="number" placeholder="1.3" min="0" step="0.01" class="bagatelle-input mt-1" oninput="calculateTaxDashboard()" disabled>
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <section class="tax-main space-y-5">
+            <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <div class="kpi-card p-4 kpi-help">
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">税前总收入/Gesamt-Brutto</div><span class="info-dot">i</span><div class="kpi-tooltip"><strong>算法</strong><p>税前总收入/Gesamt-Brutto = Person A/B 的税前年收入/Brutto + Bonus 总和。</p></div></div>
+                    <div class="text-2xl font-bold text-blue-600">€ <span id="kpiGross">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1">税前工资与奖金</div>
+                </div>
+                <div class="kpi-card p-4 kpi-help">
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">税后月收入/Netto</div><span class="info-dot">i</span><div class="kpi-tooltip"><strong>算法</strong><p>税后月收入 = 税后年收入/Netto ÷ 12。这里固定使用默认 Werbungskostenpauschale € 1.230：Gesamt-Brutto - 社保/SV - 默认口径应税/ESt；不受输入的工作开销/Werbungskosten 影响。</p></div></div>
+                    <div class="text-2xl font-bold text-green-600">€ <span id="kpiNetMonthly">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1">税后年收入/Netto：€ <span id="kpiNetAnnual">0</span></div>
+                </div>
+                <div class="kpi-card p-4 kpi-help">
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">社保/SV</div><span class="info-dot">i</span><div class="kpi-tooltip"><strong>算法</strong><p>养老、失业、医保、护理保险按雇员侧比例计算，并应用德国 2026 社保缴费上限。</p><p>KV/PV 上限：€ 69.750/年（€ 5.812,50/月）。</p><p>RV/AV 上限：€ 101.400/年（€ 8.450/月）。</p></div></div>
+                    <div class="text-2xl font-bold text-red-500">€ <span id="kpiSocial">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1">可抵扣为 Vorsorgeaufwand 近似</div>
+                </div>
+                <div class="kpi-card p-4 kpi-help">
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">报税/Steuererklärung</div><span class="info-dot">i</span><div class="kpi-tooltip kpi-tooltip-right"><strong>算法</strong><p>补税/退税 = 应税/ESt - 工资税/Lohnsteuer。</p><p>应税/ESt：从 Brutto 扣除可抵税 Vorsorgepauschale、Werbungskosten（留空/低于 € 1.230 使用 Pauschale；填写更高工作开销则用填写值）与 Sonderausgabenpauschbetrag € 36 后，按 2026 ESt 公式计算。合并申报使用 splitting。</p><p>工资税/Lohnsteuer：Sankey 中始终按默认 Werbungskostenpauschale € 1.230 估算；输入的工作开销只改变应税/ESt 与 plot2 的应税收入/zvE。V 中 KV 按 96%，PV 全额；AV 仅在 KV+PV 低于 € 1.900 时使用剩余额度。</p></div></div>
+                    <div class="text-2xl font-bold" id="kpiBalanceWrap">€ <span id="kpiBalance">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1" id="withheldHint">应税/ESt：€ <span id="kpiTax">0</span> · 工资税/Lohnsteuer：€ <span id="kpiWithheld">0</span></div>
+                </div>
+            </div>
+
+            <div class="chart-card tax-sankey-card p-5 flex flex-col">
+                <div class="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
+                    <h2 class="section-title text-lg font-bold text-gray-800">年收入流向 Sankey Diagram</h2>
+                    <span class="matrix-pill">Gesamt-Brutto → 社保/SV / 社保后收入 → 工资税/Lohnsteuer / 税后年收入/Netto</span>
+                </div>
+                <div class="tax-sankey-wrap">
+                    <div id="taxSankey" role="img" aria-label="德国收入流向图"></div>
+                </div>
+            </div>
+
+            <div class="chart-card tax-rate-card p-5 flex flex-col">
+                <div class="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
+                    <div class="kpi-label-row tax-plot-title">
+                        <h2 class="section-title text-lg font-bold text-gray-800">2026 应税收入/zvE 税率曲线</h2>
+                        <span class="info-dot">i</span>
+                        <div class="kpi-tooltip tax-formula-tooltip">
+                            <strong>2026 Einkommensteuer 公式</strong>
+                            <p>a) zvE ≤ 12.348：ESt = 0</p>
+                            <p>b) 12.349–17.799：ESt = (914,51 × y + 1.400) × y<br>y = (zvE - 12.348) / 10.000</p>
+                            <p>c) 17.800–69.878：ESt = (173,1 × z + 2.397) × z + 1.034,87<br>z = (zvE - 17.799) / 10.000</p>
+                            <p>d) 69.879–277.825：ESt = 0,42 × zvE - 11.135,63</p>
+                            <p>e) zvE ≥ 277.826：ESt = 0,45 × zvE - 19.470,38</p>
+                            <p>夫妇合并申报：家庭 ESt = 2 × ESt(家庭 zvE / 2)，因此图中的免税额、低税率区间与 Spitzensteuersatz 门槛都会按家庭总 zvE 口径翻倍。</p>
+                        </div>
+                    </div>
+                    <span class="matrix-pill">横轴：应税收入/zvE · 纵轴：税率</span>
+                </div>
+                <div class="tax-rate-wrap">
+                    <div id="taxRatePlot" role="img" aria-label="2026 年德国 zu versteuerndes Einkommen 与平均税率曲线"></div>
+                    <aside id="zveFormulaPanel" class="zve-formula-panel" aria-label="应税收入 zvE 计算过程"></aside>
+                </div>
+            </div>
+
+
+        </section>
+    </main>
+
+    <script src="../assets/js/germany-tax.js"></script>
+</body>
+</html>
