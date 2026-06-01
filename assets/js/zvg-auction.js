@@ -8,7 +8,7 @@ const MONTHS_DE = {
 };
 
 const BERLIN_CENTER = [52.52, 13.405];
-const RENDER_API_BASE = 'https://bagatelle-api.onrender.com';
+const RENDER_API_BASE = 'https://bagatelle-lg9a.onrender.com';
 
 function getApiBase() {
     const configured = window.BAGATELLE_ZVG_API_BASE;
@@ -91,8 +91,9 @@ async function loadOptions() {
 
     const land = $('zvgLand');
     land.innerHTML = '';
+    land.appendChild(option('Bitte Bundesland wählen', ''));
     zvgOptions.lands.forEach(item => land.appendChild(option(item.label, item.value)));
-    land.value = 'be';
+    land.value = '';
 
     const object = $('zvgObject');
     object.innerHTML = '';
@@ -100,13 +101,18 @@ async function loadOptions() {
     zvgOptions.objectTypes.forEach(item => object.appendChild(option(item.label, item.value)));
 
     populateCourts();
-    setStatus('筛选项已加载。默认显示 Berlin 全部 Amtsgerichte。');
+    setStatus('筛选项已加载。请选择 Bundesland 后点击搜索。');
 }
 
 function populateCourts() {
     const court = $('zvgCourt');
     const selectedLand = $('zvgLand').value;
     court.innerHTML = '';
+    if (!selectedLand) {
+        court.appendChild(option('Bitte zuerst Land wählen', ''));
+        court.value = '';
+        return;
+    }
     (zvgOptions.courts[selectedLand] || [{ value: '0', label: 'Alle Amtsgerichte' }]).forEach(item => {
         if (item.value || item.label) court.appendChild(option(item.label, item.value));
     });
@@ -294,6 +300,12 @@ async function searchZvg() {
     const empty = $('zvgEmpty');
     grid.innerHTML = '';
     empty.classList.add('hidden');
+    if (!$('zvgLand').value) {
+        currentItems = [];
+        renderMap([]);
+        setStatus('请先选择 Land / Bundesland，再点击搜索。', 'error');
+        return;
+    }
     const searchLabel = document.querySelector('#zvgSearch .zvg-search-label');
     $('zvgSearch').disabled = true;
     if (searchLabel) searchLabel.textContent = '抓取中…';
@@ -330,15 +342,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     initMap();
     window.addEventListener('resize', syncMapHeight, { passive: true });
     window.addEventListener('orientationchange', syncMapHeight, { passive: true });
-    $('zvgLand').addEventListener('change', () => { populateCourts(); searchZvg(); });
-    $('zvgCourt').addEventListener('change', searchZvg);
-    $('zvgObject').addEventListener('change', searchZvg);
-    $('zvgMaxPrice').addEventListener('change', searchZvg);
+    $('zvgLand').addEventListener('change', populateCourts);
     $('zvgMaxPrice').addEventListener('input', () => { $('zvgMaxPrice').value = formatPlainMoney($('zvgMaxPrice').value); });
     $('zvgSearch').addEventListener('click', searchZvg);
     try {
         await loadOptions();
-        await searchZvg();
     } catch (err) {
         setStatus(`初始化失败：${explainFetchError(err)}`, 'error');
     }
