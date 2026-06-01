@@ -2,8 +2,8 @@
 const BUYING_COST_RATE = 0.08; // 8% 购房附加费
 const BUILDING_RATIO = 0.75; // 建筑价值占比(用于计算折旧)
 const DEPRECIATION_RATE = 0.02; // 2% 直线折旧 AfA
-const RENT_INCREASE_RATE = 0.01; // 每年租金涨幅 1.0%
-const PROP_APPRECIATION_RATE = 0.01; // 每年房价涨幅 1.0%
+const DEFAULT_RENT_INCREASE_RATE = 0; // 每年租金涨幅固定为 0%
+const DEFAULT_PROP_APPRECIATION_RATE = 0; // 默认每年房价涨幅 0%
 
 let chartInstance = null;
 let macroChartInstance = null; // 新增宏观图表实例变量
@@ -17,7 +17,9 @@ const CHART_THEME = {
     mortgage: 'rgba(132, 63, 55, 0.72)',
     wealth: '#18212f',
     forecast: '#6f58b6',
-    fillBlue: 'rgba(35, 78, 156, 0.10)'
+    fillBlue: 'rgba(35, 78, 156, 0.10)',
+    newBuild: '#2f8f67',
+    rentPerSqm: '#b84c3f'
 };
 
 if (window.Chart) {
@@ -29,6 +31,38 @@ if (window.Chart) {
 // 格式化货币
 const formatEuro = (num) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
+};
+
+const formatPercent = (num, digits = 1) => Number.isFinite(num) ? (num * 100).toFixed(digits) + '%' : '—';
+
+// 现金流IRR：cashflows[0]为初始投入，之后为每期现金流。
+const calculateIRR = (cashflows) => {
+    const npv = (rate) => cashflows.reduce((sum, cf, idx) => sum + cf / Math.pow(1 + rate, idx), 0);
+    let low = -0.9999;
+    let high = 10;
+    let lowVal = npv(low);
+    let highVal = npv(high);
+
+    // 若10倍上限仍无法包住根，逐步抬高上限。
+    while (lowVal * highVal > 0 && high < 1000) {
+        high *= 2;
+        highVal = npv(high);
+    }
+    if (lowVal * highVal > 0) return NaN;
+
+    for (let i = 0; i < 120; i++) {
+        const mid = (low + high) / 2;
+        const midVal = npv(mid);
+        if (Math.abs(midVal) < 0.01) return mid;
+        if (lowVal * midVal <= 0) {
+            high = mid;
+            highVal = midVal;
+        } else {
+            low = mid;
+            lowVal = midVal;
+        }
+    }
+    return (low + high) / 2;
 };
 
 // UI选中状态高亮
@@ -99,6 +133,9 @@ const calculate = () => {
     const interestRate = parseFloat(document.getElementById('interestRateInput').value) / 100;
     const loanTerm = parseInt(document.getElementById('loanTermInput').value);
     const taxRate = parseFloat(document.getElementById('taxRateInput').value) / 100;
+    const rentIncreaseRate = DEFAULT_RENT_INCREASE_RATE;
+    const propAppreciationRate = parseFloat(document.getElementById('appreciationInput')?.value ?? (DEFAULT_PROP_APPRECIATION_RATE * 100)) / 100;
+    const depositRate = parseFloat(document.getElementById('depositRateInput')?.value ?? 2) / 100;
 
     // 更新UI标签
     document.getElementById('depositVal').innerText = formatEuro(deposit);
@@ -106,6 +143,8 @@ const calculate = () => {
     document.getElementById('interestRateVal').innerText = (interestRate * 100).toFixed(2) + '%';
     document.getElementById('loanTermVal').innerText = loanTerm + '年';
     document.getElementById('taxRateVal').innerText = (taxRate * 100).toFixed(0) + '%';
+    document.getElementById('appreciationVal').innerText = (propAppreciationRate * 100).toFixed(1) + '%';
+    document.getElementById('depositRateVal').innerText = (depositRate * 100).toFixed(1) + '%';
 
     // 等额本息 (PMT) 计算
     const monthlyInterestRate = interestRate / 12;
@@ -135,6 +174,9 @@ const calculate = () => {
     let cumulativeCashflow = 0;
     
     let firstYearNetCashflow = 0;
+    let tenthYearSaleProceeds = 0;
+    let irr10 = NaN;
+    const irrCashflows = [-deposit];
 
     // 为了确保能看到“20年后净资产”，强制循环至少运行到第20年
     // 如果贷款年限超过20年，则运行到贷款结束
@@ -180,8 +222,18 @@ const calculate = () => {
         }
 
         // 资产增值
-        currentPropValue *= (1 + PROP_APPRECIATION_RATE);
+        currentPropValue *= (1 + propAppreciationRate);
         let netWealth = currentPropValue - currentLoan + cumulativeCashflow;
+
+        if (year <= 10) {
+            if (year === 10) {
+                tenthYearSaleProceeds = currentPropValue - currentLoan;
+                irrCashflows.push(netCashflowYear + tenthYearSaleProceeds);
+                irr10 = calculateIRR(irrCashflows);
+            } else {
+                irrCashflows.push(netCashflowYear);
+            }
+        }
 
         // 填充图表
         rentData.push(currentRentYearly);
@@ -191,12 +243,17 @@ const calculate = () => {
         netWealthLine.push(netWealth);
 
         // 租金涨幅
-        currentRentYearly *= (1 + RENT_INCREASE_RATE);
+        currentRentYearly *= (1 + rentIncreaseRate);
     }
 
     // 更新KPI面板
     document.getElementById('kpi-mortgage').innerText = formatEuro(monthlyMortgage);
     document.getElementById('kpi-total-interest').innerText = formatEuro(totalInterest);
+    const irrElement = document.getElementById('kpi-irr10');
+    irrElement.innerText = formatPercent(irr10);
+    irrElement.className = irr10 >= depositRate ? "text-2xl font-bold text-emerald-700" : "text-2xl font-bold text-red-500";
+    irrElement.title = `10年IRR ${formatPercent(irr10)}；存款基准 ${formatPercent(depositRate)}`;
+    document.getElementById('kpi-irr-benchmark').innerText = `对比存款基准 ${formatPercent(depositRate)}`;
     
     const netCashElement = document.getElementById('kpi-netcashflow');
     netCashElement.innerText = formatEuro(firstYearNetCashflow);
@@ -340,24 +397,28 @@ const renderChart = (labels, rent, mortgage, tax, wealth) => {
 const renderMacroChart = () => {
     const ctxMacro = document.getElementById('macroInterestChart').getContext('2d');
     
-    // X轴时间节点
+    if (macroChartInstance) {
+        macroChartInstance.destroy();
+    }
+
+    // X轴时间节点：向前扩展历史周期，便于和柏林房价/租金共同观察。
     const macroLabels = [
-        '2020 H1', '2020 H2', '2021 H1', '2021 H2', 
-        '2022 H1', '2022 H2', '2023 H1', '2023 H2', 
-        '2024 H1', '2024 H2', '2025 H1', '2025 H2', 
-        '2026 现在', '2026 H2', '2027 H1', '2027 H2', '2028'
+        '2015', '2016', '2017', '2018', '2019',
+        '2020', '2021', '2022', '2023', '2024',
+        '2025', '2026 现在', '2027', '2028'
     ];
 
-    // 历史数据 (2020-2026当前)
-    // 2020-2021: ~1% 极低利率
-    // 2022: 从1.5%飙升至3.5%+
-    // 2023: 峰值达到4.2%左右
-    // 2024-2025: 在3.5%-4.0%震荡回落
-    // 2026(现在): 约3.5%
-    const historyData = [1.1, 1.0, 1.1, 1.2, 1.6, 3.4, 3.9, 4.2, 3.7, 3.5, 3.6, 3.4, 3.5, null, null, null, null];
+    // 历史/当前：德国10年期固定房贷利率，年度平均/近似。
+    const historyData = [2.0, 1.6, 1.5, 1.6, 1.3, 1.1, 1.2, 2.7, 4.0, 3.6, 3.5, 3.5, null, null];
     
-    // 预测数据 (接续2026当前点，呈平缓下降趋势)
-    const forecastData = [null, null, null, null, null, null, null, null, null, null, null, null, 3.5, 3.4, 3.3, 3.2, 3.1];
+    // 预测：接续2026当前点，呈平缓下降趋势。
+    const forecastData = [null, null, null, null, null, null, null, null, null, null, null, 3.5, 3.3, 3.1];
+
+    // 柏林新房购买平米单价：€/m²，历史趋势估算 + 温和预测。
+    const berlinNewBuildPrice = [4100, 4500, 5000, 5600, 6200, 6800, 7500, 8200, 8500, 8300, 8500, 8700, 8950, 9200];
+
+    // 柏林租房平米单价：€/m²/月，历史趋势估算 + 温和预测。
+    const berlinRentPerSqm = [8.9, 9.3, 9.8, 10.4, 11.0, 11.3, 11.8, 12.7, 14.2, 15.4, 16.4, 17.2, 18.0, 18.8];
 
     macroChartInstance = new Chart(ctxMacro, {
         type: 'line',
@@ -367,6 +428,7 @@ const renderMacroChart = () => {
                 {
                     label: '历史实际利率 (%)',
                     data: historyData,
+                    yAxisID: 'yRate',
                     borderColor: CHART_THEME.tax,
                     backgroundColor: CHART_THEME.fillBlue,
                     borderWidth: 3,
@@ -380,6 +442,7 @@ const renderMacroChart = () => {
                 {
                     label: '机构未来预测 (%)',
                     data: forecastData,
+                    yAxisID: 'yRate',
                     borderColor: '#b98a35',
                     borderWidth: 3,
                     borderDash: [6, 4], // 虚线表示预测
@@ -390,6 +453,34 @@ const renderMacroChart = () => {
                     pointStyle: 'rectRot',
                     fill: false,
                     tension: 0.3
+                },
+                {
+                    label: '柏林新房购买单价 (€/m²)',
+                    data: berlinNewBuildPrice,
+                    yAxisID: 'yPrice',
+                    borderColor: CHART_THEME.newBuild,
+                    backgroundColor: 'rgba(47, 143, 103, 0.08)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fffaf0',
+                    pointBorderColor: CHART_THEME.newBuild,
+                    pointBorderWidth: 2,
+                    pointRadius: 3,
+                    fill: false,
+                    tension: 0.34
+                },
+                {
+                    label: '柏林租房单价 (€/m²/月)',
+                    data: berlinRentPerSqm,
+                    yAxisID: 'yRent',
+                    borderColor: CHART_THEME.rentPerSqm,
+                    backgroundColor: 'rgba(184, 76, 63, 0.08)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#fffaf0',
+                    pointBorderColor: CHART_THEME.rentPerSqm,
+                    pointBorderWidth: 2,
+                    pointRadius: 3,
+                    fill: false,
+                    tension: 0.34
                 }
             ]
         },
@@ -424,7 +515,11 @@ const renderMacroChart = () => {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + '%';
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y;
+                            if (context.dataset.yAxisID === 'yRate') return label + ': ' + value.toFixed(1) + '%';
+                            if (context.dataset.yAxisID === 'yPrice') return label + ': ' + new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(value) + ' €/m²';
+                            return label + ': ' + value.toFixed(1).replace('.', ',') + ' €/m²/月';
                         }
                     }
                 },
@@ -436,11 +531,13 @@ const renderMacroChart = () => {
             scales: {
                 x: {
                     grid: { color: CHART_THEME.grid },
-                    ticks: { color: CHART_THEME.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 9 }
+                    ticks: { color: CHART_THEME.muted, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
                 },
-                y: {
+                yRate: {
+                    type: 'linear',
                     beginAtZero: true,
                     max: 5.0,
+                    position: 'left',
                     grid: { color: CHART_THEME.grid },
                     title: {
                         display: true,
@@ -450,6 +547,41 @@ const renderMacroChart = () => {
                     ticks: {
                         callback: function(value) {
                             return value.toFixed(1) + ' %';
+                        }
+                    }
+                },
+                yPrice: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 3500,
+                    max: 10000,
+                    grid: { drawOnChartArea: false },
+                    title: {
+                        display: true,
+                        color: CHART_THEME.muted,
+                        text: '新房购买单价 (€/m²)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return (value / 1000).toFixed(1) + 'k';
+                        }
+                    }
+                },
+                yRent: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 7,
+                    max: 21,
+                    offset: true,
+                    grid: { drawOnChartArea: false },
+                    title: {
+                        display: true,
+                        color: CHART_THEME.muted,
+                        text: '租金单价 (€/m²/月)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(0) + ' €';
                         }
                     }
                 }

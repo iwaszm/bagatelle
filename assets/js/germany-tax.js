@@ -208,7 +208,8 @@ function calculateTaxDashboard() {
     document.getElementById('kpiNetMonthly').innerText = fmt(assessedNet / 12);
     document.getElementById('kpiNetAnnual').innerText = fmt(assessedNet);
     document.getElementById('kpiSocial').innerText = fmt(socialTotal);
-    document.getElementById('kpiTax').innerText = fmt(totalTax);
+    document.getElementById('kpiTax').innerText = fmt(incomeTax);
+    document.getElementById('kpiSoli').innerText = fmt(soliTax);
     document.getElementById('kpiWithheld').innerText = fmt(withheld);
     document.getElementById('kpiBalance').innerText = fmt(Math.abs(balance));
     document.getElementById('kpiBalanceWrap').className = balance > 0 ? 'text-2xl font-bold text-red-500' : 'text-2xl font-bold text-green-600';
@@ -240,7 +241,7 @@ function renderSankey(data) {
     const grossLabel = '税前总收入/Gesamt-Brutto';
     const socialLabel = '社保/SV';
     const afterSocialLabel = '社保后收入';
-    const wageTaxLabel = '工资税/Lohnsteuer';
+    const wageTaxLabel = '工资税/LSt';
     const netLabel = '税后年收入/Netto';
     const afterSocial = Math.max(0, data.grossTotal - data.socialTotal);
     const pct = (value) => data.grossTotal > 0 ? `${(value / data.grossTotal * 100).toFixed(1)}%` : '0.0%';
@@ -296,7 +297,7 @@ function renderSankey(data) {
             const personGross = `${p.name} Brutto`;
             const personSocial = `${p.name} 社保/SV`;
             const personAfterSocial = `${p.name} 社保后收入`;
-            const personTax = `${p.name} 工资税/Lohnsteuer`;
+            const personTax = `${p.name} 工资税/LSt`;
             const personNet = `${p.name} 税后年收入/Netto`;
             const personAfterSocialValue = Math.max(0, p.gross - p.social.total);
             const personNetValue = Math.max(0, p.gross - p.social.total - p.estimatedWithheld);
@@ -572,7 +573,7 @@ function renderZveFormulaPanel(data) {
                     <div class="zve-result-line"><span>zvE =</span><strong>€ ${fmt(p.withholdingBase)}</strong></div>
                     ${calcRows}
                     <div class="lohnsteuer-block">
-                        <div class="zve-result-line lohnsteuer-result"><span>Lohnsteuer =</span><strong>€ ${fmt(p.estimatedWithheld)}</strong></div>
+                        <div class="zve-result-line lohnsteuer-result"><span>LSt =</span><strong>€ ${fmt(p.estimatedWithheld)}</strong></div>
                         <div class="lohnsteuer-formula">${lohnsteuerFormula}</div>
                         <div class="lohnsteuer-details">${lohnsteuerDetails}</div>
                         ${lohnsteuerNote ? `<div class="lohnsteuer-note">${lohnsteuerNote}</div>` : ''}

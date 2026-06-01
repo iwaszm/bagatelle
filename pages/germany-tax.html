@@ -21,7 +21,7 @@
             <a class="nav-link" href="../index.html">房产投资测算</a>
             <a class="nav-link" href="./pension-insurance.html">养老保险测算</a>
             <a class="nav-link active" href="./germany-tax.html">德国报税测算</a>
-            <a class="nav-link disabled" href="#" aria-disabled="true">更多页面预留</a>
+            <a class="nav-link" href="./zwangsversteigerung.html">ZVG拍卖</a>
         </div>
     </nav>
 
@@ -116,7 +116,7 @@
                     <div class="text-[10px] text-gray-400 mt-1">税前工资与奖金</div>
                 </div>
                 <div class="kpi-card p-4 kpi-help">
-                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">税后月收入/Netto</div><span class="info-dot">i</span><div class="kpi-tooltip"><strong>算法</strong><p>税后月收入 = 税后年收入/Netto ÷ 12。这里固定使用默认 Werbungskostenpauschale € 1.230：Gesamt-Brutto - 社保/SV - 默认口径应税/ESt；不受输入的工作开销/Werbungskosten 影响。</p></div></div>
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">税后月收入/Netto</div><span class="info-dot">i</span><div class="kpi-tooltip"><strong>算法</strong><p>税后月收入 = 税后年收入/Netto ÷ 12。口径：Gesamt-Brutto - 社保/SV - 默认扣除口径下的 ESt/Soli。</p></div></div>
                     <div class="text-2xl font-bold text-green-600">€ <span id="kpiNetMonthly">0</span></div>
                     <div class="text-[10px] text-gray-400 mt-1">税后年收入/Netto：€ <span id="kpiNetAnnual">0</span></div>
                 </div>
@@ -126,16 +126,16 @@
                     <div class="text-[10px] text-gray-400 mt-1">可抵扣为 Vorsorgeaufwand 近似</div>
                 </div>
                 <div class="kpi-card p-4 kpi-help">
-                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">报税/Steuererklärung</div><span class="info-dot">i</span><div class="kpi-tooltip kpi-tooltip-right"><strong>算法</strong><p>补税/退税 = 应税/ESt - 工资税/Lohnsteuer。</p><p>应税/ESt：从 Brutto 扣除可抵税 Vorsorgepauschale、Werbungskosten（留空/低于 € 1.230 使用 Pauschale；填写更高工作开销则用填写值）与 Sonderausgabenpauschbetrag € 36 后，按 2026 ESt 公式计算。合并申报使用 splitting。</p><p>工资税/Lohnsteuer：Sankey 中始终按默认 Werbungskostenpauschale € 1.230 估算；输入的工作开销只改变应税/ESt 与 plot2 的应税收入/zvE。V 中 KV 按 96%，PV 全额；AV 仅在 KV+PV 低于 € 1.900 时使用剩余额度。</p></div></div>
+                    <div class="kpi-label-row"><div class="text-xs text-gray-500 mb-1">报税/Steuererklärung</div><span class="info-dot">i</span><div class="kpi-tooltip kpi-tooltip-right"><strong>算法</strong><p>退税/补税 = LSt - ESt - Soli。</p><p>ESt：Brutto 扣除社保可抵扣部分、Werbungskosten 与 Sonderausgaben 后，按 2026 ESt 公式计算；合并申报使用 splitting。</p><p>LSt：按税级估算工资预扣税；工作开销高于 € 1.230 时主要影响报税 ESt。</p><p>Soli：超过免征线后按 5.5% × ESt 近似。</p></div></div>
                     <div class="text-2xl font-bold" id="kpiBalanceWrap">€ <span id="kpiBalance">0</span></div>
-                    <div class="text-[10px] text-gray-400 mt-1" id="withheldHint">应税/ESt：€ <span id="kpiTax">0</span> · 工资税/Lohnsteuer：€ <span id="kpiWithheld">0</span></div>
+                    <div class="text-[10px] text-gray-400 mt-1" id="withheldHint">LSt - ESt - Soli = € <span id="kpiWithheld">0</span> - € <span id="kpiTax">0</span> - € <span id="kpiSoli">0</span></div>
                 </div>
             </div>
 
             <div class="chart-card tax-sankey-card p-5 flex flex-col">
                 <div class="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
                     <h2 class="section-title text-lg font-bold text-gray-800">年收入流向 Sankey Diagram</h2>
-                    <span class="matrix-pill">Gesamt-Brutto → 社保/SV / 社保后收入 → 工资税/Lohnsteuer / 税后年收入/Netto</span>
+                    <span class="matrix-pill">Gesamt-Brutto → 社保/SV / 社保后收入 → 工资税/LSt / 税后年收入/Netto</span>
                 </div>
                 <div class="tax-sankey-wrap">
                     <div id="taxSankey" role="img" aria-label="德国收入流向图"></div>
