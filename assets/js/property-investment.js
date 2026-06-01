@@ -4,6 +4,7 @@ const BUILDING_RATIO = 0.75; // 建筑价值占比(用于计算折旧)
 const DEPRECIATION_RATE = 0.02; // 2% 直线折旧 AfA
 const DEFAULT_RENT_INCREASE_RATE = 0; // 每年租金涨幅固定为 0%
 const DEFAULT_PROP_APPRECIATION_RATE = 0; // 默认每年房价涨幅 0%
+const DEPOSIT_STOP_RATE = 0.08; // 首付款滑杆在房价 8% 处提供卡点
 
 let chartInstance = null;
 let macroChartInstance = null; // 新增宏观图表实例变量
@@ -92,11 +93,47 @@ const getSelectedProperty = () => {
     return { price: customPriceWan * 10000, rent: customRent };
 };
 
+const getDepositStop = (price) => price * DEPOSIT_STOP_RATE;
+
+const configureFinancingControls = (totalCost, price) => {
+    const depositInput = document.getElementById('depositInput');
+    const loanInput = document.getElementById('loanInput');
+    const depositStopMarker = document.getElementById('depositStopMarker');
+    const depositStop = getDepositStop(price);
+
+    depositInput.min = 0;
+    depositInput.max = totalCost;
+    loanInput.min = 0;
+    loanInput.max = totalCost;
+
+    if (depositStopMarker) {
+        depositStopMarker.style.setProperty('--deposit-stop-position', `${(depositStop / totalCost) * 100}%`);
+        depositStopMarker.title = `房价8%卡点: ${formatEuro(depositStop)}`;
+    }
+    if (parseFloat(depositInput.value) > totalCost) {
+        depositInput.value = totalCost;
+    }
+    if (parseFloat(depositInput.value) < 0) {
+        depositInput.value = 0;
+    }
+    if (parseFloat(loanInput.value) > totalCost) {
+        loanInput.value = totalCost;
+    }
+};
+
+const applyDepositDetent = (deposit, price) => {
+    const depositStop = getDepositStop(price);
+    return Math.abs(deposit - depositStop) <= 1000 ? depositStop : deposit;
+};
+
 // 同步滑动条逻辑 (存款+贷款 = 房价总成本)
 const syncLoanFromDeposit = () => {
     const prop = getSelectedProperty();
     const totalCost = prop.price * (1 + BUYING_COST_RATE);
-    const deposit = parseFloat(document.getElementById('depositInput').value);
+    configureFinancingControls(totalCost, prop.price);
+    const depositInput = document.getElementById('depositInput');
+    const deposit = applyDepositDetent(parseFloat(depositInput.value), prop.price);
+    depositInput.value = deposit;
     let calculatedLoan = totalCost - deposit;
     if (calculatedLoan < 0) calculatedLoan = 0;
     document.getElementById('loanInput').value = calculatedLoan;
@@ -105,10 +142,11 @@ const syncLoanFromDeposit = () => {
 const syncDepositFromLoan = () => {
     const prop = getSelectedProperty();
     const totalCost = prop.price * (1 + BUYING_COST_RATE);
+    configureFinancingControls(totalCost, prop.price);
     const loan = parseFloat(document.getElementById('loanInput').value);
-    let calculatedDeposit = totalCost - loan;
-    if (calculatedDeposit < 0) calculatedDeposit = 0;
+    let calculatedDeposit = applyDepositDetent(Math.max(0, totalCost - loan), prop.price);
     document.getElementById('depositInput').value = calculatedDeposit;
+    document.getElementById('loanInput').value = totalCost - calculatedDeposit;
 };
 
 // 主计算逻辑
@@ -121,6 +159,7 @@ const calculate = () => {
     
     const totalCost = price * (1 + BUYING_COST_RATE);
     document.getElementById('totalCostDisplay').innerText = formatEuro(totalCost);
+    configureFinancingControls(totalCost, price);
 
     const deposit = parseFloat(document.getElementById('depositInput').value);
     let loan = parseFloat(document.getElementById('loanInput').value);

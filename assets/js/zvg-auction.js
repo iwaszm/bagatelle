@@ -8,6 +8,25 @@ const MONTHS_DE = {
 };
 
 const BERLIN_CENTER = [52.52, 13.405];
+const RENDER_API_BASE = 'https://bagatelle-api.onrender.com';
+
+function getApiBase() {
+    const configured = window.BAGATELLE_ZVG_API_BASE;
+    if (typeof configured === 'string') return configured.replace(/\/$/, '');
+
+    const { hostname, origin, protocol } = window.location;
+    const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
+    if (protocol === 'file:') return 'http://localhost:8000';
+    if (localHosts.has(hostname)) return origin;
+    if (hostname.endsWith('.onrender.com')) return origin;
+    return RENDER_API_BASE;
+}
+
+const API_BASE = getApiBase();
+
+function apiUrl(path) {
+    return `${API_BASE}${path}`;
+}
 
 function parseLocaleNumber(value) {
     const raw = String(value ?? '').trim();
@@ -54,9 +73,19 @@ function setStatus(text, tone = 'muted') {
     el.className = tone === 'error' ? 'text-xs text-red-600 font-semibold' : 'text-xs text-gray-500';
 }
 
+function explainFetchError(err) {
+    if (err instanceof TypeError && window.location.protocol === 'file:') {
+        return '无法连接本地 API。请先运行 python server.py，然后打开 http://localhost:8000/pages/zwangsversteigerung.html。';
+    }
+    if (err instanceof TypeError) {
+        return `无法连接 ZVG API（${API_BASE}）。如果 Render Free 正在冷启动，请稍等一分钟后重试。`;
+    }
+    return err.message;
+}
+
 async function loadOptions() {
     setStatus('正在加载 ZVG 筛选项…');
-    const res = await fetch('/api/zvg/options');
+    const res = await fetch(apiUrl('/api/zvg/options'));
     if (!res.ok) throw new Error('筛选项加载失败');
     zvgOptions = await res.json();
 
@@ -144,8 +173,8 @@ function initMap() {
 function popupHtml(item, index) {
     const price = item.price ? euro.format(item.price) : escapeHtml(item.priceText || '—');
     const links = [
-        item.detailUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${item.detailUrl}" target="_blank" rel="noreferrer">Detail</a>` : '',
-        item.exposePdfUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${item.exposePdfUrl}" target="_blank">Exposee</a>` : ''
+        item.detailUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${apiUrl(item.detailUrl)}" target="_blank" rel="noreferrer">Detail</a>` : '',
+        item.exposePdfUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${apiUrl(item.exposePdfUrl)}" target="_blank">Exposee</a>` : ''
     ].filter(Boolean).join(' · ');
     return `
         <div class="zvg-map-infobox">
@@ -210,11 +239,11 @@ function renderMap(items) {
 function renderCard(item, index) {
     const price = item.price ? euro.format(item.price) : escapeHtml(item.priceText || '—');
     const image = item.thumbnailUrl
-        ? `<img loading="lazy" src="${item.thumbnailUrl}" alt="Expose/Fotos ${escapeHtml(item.caseNo)}" onerror="this.parentElement.innerHTML='<span>NO PREVIEW</span>'">`
+        ? `<img loading="lazy" src="${apiUrl(item.thumbnailUrl)}" alt="Expose/Fotos ${escapeHtml(item.caseNo)}" onerror="this.parentElement.innerHTML='<span>NO PREVIEW</span>'">`
         : '<span>NO EXPOSÉ</span>';
     const links = [
-        item.detailUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${item.detailUrl}" target="_blank" rel="noreferrer">Detail</a>` : '',
-        item.exposePdfUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${item.exposePdfUrl}" target="_blank">Exposee</a>` : ''
+        item.detailUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${apiUrl(item.detailUrl)}" target="_blank" rel="noreferrer">Detail</a>` : '',
+        item.exposePdfUrl ? `<a class="text-[#234e9c] font-bold hover:underline" href="${apiUrl(item.exposePdfUrl)}" target="_blank">Exposee</a>` : ''
     ].filter(Boolean).join(' · ');
 
     return `
@@ -265,8 +294,9 @@ async function searchZvg() {
     const empty = $('zvgEmpty');
     grid.innerHTML = '';
     empty.classList.add('hidden');
+    const searchLabel = document.querySelector('#zvgSearch .zvg-search-label');
     $('zvgSearch').disabled = true;
-    $('zvgSearch').textContent = '抓取中…';
+    if (searchLabel) searchLabel.textContent = '抓取中…';
     setStatus('正在从 zvg-portal.de 抓取结果与地图坐标…');
     try {
         const params = new URLSearchParams({
@@ -275,7 +305,7 @@ async function searchZvg() {
             obj_liste: $('zvgObject').value,
             max_price: parseLocaleNumber($('zvgMaxPrice').value) || ''
         });
-        const res = await fetch(`/api/zvg/search?${params}`);
+        const res = await fetch(apiUrl(`/api/zvg/search?${params}`));
         const payload = await res.json();
         if (!res.ok || payload.error) throw new Error(payload.error || '搜索失败');
         currentItems = payload.items || [];
@@ -288,10 +318,10 @@ async function searchZvg() {
         setStatus(`已加载 ${currentItems.length} 个项目，地图标注 ${mapped} 个${missing ? `，${missing} 个缺少可靠坐标` : ''}。`);
     } catch (err) {
         console.error(err);
-        setStatus(`抓取失败：${err.message}`, 'error');
+        setStatus(`抓取失败：${explainFetchError(err)}`, 'error');
     } finally {
         $('zvgSearch').disabled = false;
-        $('zvgSearch').textContent = '搜索 Termine';
+        if (searchLabel) searchLabel.textContent = '搜索 Termine';
     }
 }
 
@@ -310,6 +340,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         await loadOptions();
         await searchZvg();
     } catch (err) {
-        setStatus(`初始化失败：${err.message}`, 'error');
+        setStatus(`初始化失败：${explainFetchError(err)}`, 'error');
     }
 });

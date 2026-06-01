@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -104,6 +105,16 @@ def json_response(handler, payload, status=200):
     handler.wfile.write(body)
 
 
+def text_response(handler, text, status=200):
+    body = text.encode('utf-8')
+    handler.send_response(status)
+    handler.send_header('Content-Type', 'text/plain; charset=utf-8')
+    handler.send_header('Cache-Control', 'no-store')
+    handler.send_header('Content-Length', str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
 def fetch_html(params=None, method='get', data=None):
     if method == 'post':
         r = session.post(ZVG, params=params, data=data, timeout=30, headers={'Referer': ZVG})
@@ -118,9 +129,12 @@ def fetch_html(params=None, method='get', data=None):
 def get_options():
     cache_file = CACHE / 'options.json'
     if cache_file.exists() and time.time() - cache_file.stat().st_mtime < 86400:
-        cached = json.loads(cache_file.read_text())
-        cached['objectTypes'] = normalize_object_types(cached.get('objectTypes', []))
-        return cached
+        try:
+            cached = json.loads(cache_file.read_text(encoding='utf-8'))
+            cached['objectTypes'] = normalize_object_types(cached.get('objectTypes', []))
+            return cached
+        except (OSError, json.JSONDecodeError):
+            cache_file.unlink(missing_ok=True)
 
     html = fetch_html({'button': 'Termine suchen'})
     soup = BeautifulSoup(html, 'html.parser')
@@ -156,7 +170,7 @@ def get_options():
             courts[land].append({'value': value, 'label': label.strip()})
 
     result = {'lands': lands, 'courts': courts, 'objectTypes': normalize_object_types(object_types)}
-    cache_file.write_text(json.dumps(result, ensure_ascii=False))
+    cache_file.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
     return result
 
 
@@ -244,16 +258,16 @@ def geocode_address(address):
     key = re.sub(r'[^a-zA-Z0-9]+', '_', address.lower()).strip('_')[:120]
     cache_file = GEOCODE_CACHE / f'{key}.json'
     if cache_file.exists():
-        data = json.loads(cache_file.read_text())
+        data = json.loads(cache_file.read_text(encoding='utf-8'))
         if data:
             return data
     for candidate in geocode_candidates(address):
         candidate_key = re.sub(r'[^a-zA-Z0-9]+', '_', candidate.lower()).strip('_')[:120]
         candidate_cache = GEOCODE_CACHE / f'{candidate_key}.json'
         if candidate_cache.exists():
-            data = json.loads(candidate_cache.read_text())
+            data = json.loads(candidate_cache.read_text(encoding='utf-8'))
             if data:
-                cache_file.write_text(json.dumps(data))
+                cache_file.write_text(json.dumps(data), encoding='utf-8')
                 return data
             continue
         try:
@@ -267,15 +281,15 @@ def geocode_address(address):
             results = r.json()
             if results:
                 data = {'lat': float(results[0]['lat']), 'lon': float(results[0]['lon']), 'geocodeQuery': candidate}
-                candidate_cache.write_text(json.dumps(data))
-                cache_file.write_text(json.dumps(data))
+                candidate_cache.write_text(json.dumps(data), encoding='utf-8')
+                cache_file.write_text(json.dumps(data), encoding='utf-8')
                 time.sleep(1.05)  # Nominatim public usage policy: keep requests modest.
                 return data
-            candidate_cache.write_text('{}')
+            candidate_cache.write_text('{}', encoding='utf-8')
             time.sleep(1.05)  # Nominatim public usage policy: keep requests modest.
         except Exception:
-            candidate_cache.write_text('{}')
-    cache_file.write_text('{}')
+            candidate_cache.write_text('{}', encoding='utf-8')
+    cache_file.write_text('{}', encoding='utf-8')
     return None
 
 
@@ -395,6 +409,16 @@ def fetch_pdf_bytes(land, zvg_id, file_id):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.end_headers()
+
     def translate_path(self, path):
         # Serve files relative to project dir, not cwd surprises.
         parsed = urlparse(path)
@@ -437,15 +461,20 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/zvg/thumb':
             q = parse_qs(parsed.query)
             land, zvg_id, file_id = q.get('land_abk', [''])[0], q.get('zvg_id', [''])[0], q.get('file_id', [''])[0]
+            if not shutil.which('pdftoppm'):
+                return text_response(self, 'NO PREVIEW', 503)
             jpg = CACHE / f'{land}_{zvg_id}_{file_id}.jpg'
-            if not jpg.exists():
-                pdf = fetch_pdf_bytes(land, zvg_id, file_id)
-                with tempfile.TemporaryDirectory() as td:
-                    pdf_path = Path(td) / 'doc.pdf'
-                    out = Path(td) / 'thumb'
-                    pdf_path.write_bytes(pdf)
-                    subprocess.run(['pdftoppm', '-f', '1', '-singlefile', '-jpeg', '-scale-to-x', '720', '-scale-to-y', '-1', str(pdf_path), str(out)], check=True, timeout=30)
-                    jpg.write_bytes((Path(td) / 'thumb.jpg').read_bytes())
+            try:
+                if not jpg.exists():
+                    pdf = fetch_pdf_bytes(land, zvg_id, file_id)
+                    with tempfile.TemporaryDirectory() as td:
+                        pdf_path = Path(td) / 'doc.pdf'
+                        out = Path(td) / 'thumb'
+                        pdf_path.write_bytes(pdf)
+                        subprocess.run(['pdftoppm', '-f', '1', '-singlefile', '-jpeg', '-scale-to-x', '720', '-scale-to-y', '-1', str(pdf_path), str(out)], check=True, timeout=30)
+                        jpg.write_bytes((Path(td) / 'thumb.jpg').read_bytes())
+            except Exception as exc:
+                return text_response(self, f'NO PREVIEW: {exc}', 503)
             data = jpg.read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', 'image/jpeg')
